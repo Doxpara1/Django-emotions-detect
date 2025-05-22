@@ -1,52 +1,49 @@
-from rest_framework import viewsets
-from rest_framework.response import Response
-from rest_framework import status
-from .models import User
-from .serializer import UserSerializer
+from django.views.generic import TemplateView
+from .models import User  
 
 from textblob import TextBlob
 from nrclex import NRCLex
 
-
-
-class UserViewset(viewsets.ModelViewSet):
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-
+class UserFormView(TemplateView):
+    template_name = 'index.html'
 
     def detect_emotions(self, text):
-        # Analyze basic sentiment using TextBlob
+        # ... your emotion detection code (same as before)
         blob = TextBlob(text)
         polarity = round(blob.sentiment.polarity, 2)
         subjectivity = round(blob.sentiment.subjectivity, 2)
-
-        # Analyze emotions using NRC Emotion Lexicon
         emotion = NRCLex(text)
         emotion_scores = emotion.raw_emotion_scores
+        dominant_emotion = max(emotion_scores, key=emotion_scores.get) if emotion_scores else None
 
-        if not emotion_scores:
-            emotion_summary = "No strong emotion detected."
-            dominant_emotion = None
-        else:
-            # Find dominant emotion
-            dominant_emotion = max(emotion_scores, key=emotion_scores.get)
-            emotion_summary = f"The dominant emotion is **{dominant_emotion}** with contributing emotions: " + \
-                            ", ".join([f"{k} ({v})" for k, v in emotion_scores.items()])
+        return {
+            "polarity": polarity,
+            "subjectivity": subjectivity,
+            "dominant_emotion": dominant_emotion,
+            "emotion_scores": emotion_scores,
+        }
 
-        self.result = dominant_emotion
-        return self.result
+    def post(self, request, *args, **kwargs):
+        sentence = request.POST.get('sentence', '')
+        emotions = self.detect_emotions(sentence)
+
+        # Save to database
+        user_entry = User.objects.create(
+            sentence=sentence,
+            polarity=emotions['polarity'],
+            subjectivity=emotions['subjectivity'],
+            dominant_emotion=emotions['dominant_emotion'],
+            emotion_scores=emotions['emotion_scores']
+        )
+
+        context = self.get_context_data(sentence=sentence, emotions=emotions, saved=user_entry)
+        return self.render_to_response(context)
 
 
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+from django.views.generic import ListView
+from .models import User
 
-        # Extract x, y as strings (convert if needed)
-        x = str(serializer.validated_data['sentence'])
-
-        # passing the value to function
-        emotions =  self.detect_emotions(x)
-        instance = serializer.save(emotions=emotions)
-        output_serializer = self.get_serializer(instance)
-        headers = self.get_success_headers(output_serializer.data)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+class UserListView(ListView):
+    model = User
+    template_name = 'user_list.html'  # create this template
+    context_object_name = 'users'     # accessible in the template as 'users'

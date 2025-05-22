@@ -1,0 +1,38 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+
+    <title>Emotion Detection Form</title>
+</head>
+<body>
+    <h1>Enter a Sentence to Detect Emotions</h1>
+
+    <form method="post">
+        {% csrf_token %}
+        <textarea name="sentence" rows="4" cols="50" placeholder="Type your sentence here...">{{ sentence }}</textarea><br><br>
+        <button type="submit">Analyze Emotion</button>
+    </form>
+
+    {% if emotions %}
+        <h2>Analysis Result:</h2>
+        <p><strong>Polarity:</strong> {{ emotions.polarity }}</p>
+        <p><strong>Subjectivity:</strong> {{ emotions.subjectivity }}</p>
+        <p><strong>Dominant Emotion:</strong> {{ emotions.dominant_emotion }}</p>
+        <p><strong>Emotion Scores:</strong></p>
+        <ul>
+            {% for emotion, score in emotions.emotion_scores.items %}
+                <li>{{ emotion }}: {{ score }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form action="{% url 'user_list' %}" method="get" style="margin-top: 20px;">
+        <button type="submit">View All Saved Entries</button>
+    </form>
+
+</body>
+</html>
